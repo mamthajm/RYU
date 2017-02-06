@@ -16,6 +16,8 @@
 import ncclient
 import ncclient.manager
 import ncclient.xml_
+import logging
+LOG = logging.getLogger(__name__)
 
 class MonCapableSwitch(object):
     def __init__(self, connect_method='connect_ssh', *args, **kwargs):
@@ -58,17 +60,49 @@ class MonCapableSwitch(object):
         return self.raw_get_config(source)
 
     def edit_config(self,config,target):
-        self.netconf.edit_config(config,target='running')
+        try:
+         self.netconf.edit_config(config,target='running')
+        except:
+           LOG.info("Could not make the connection!!!")
+
     def subscribe(self):
-        self.netconf.create_subscription(stream_name="MON_STREAM")
+        self.netconf.create_subscription()
+
+#This is only a test function to check on the NETCONF server.
+    def rpc_mon_stop(self,config):
+        print config
+        rpc_reply = self.netconf.mon_stop(config)
+        return rpc_reply
+
+    def rpc_mon_status(self,config):
+        print 'in rpc mon_status'
+        rpc_reply = self.netconf.mon_status(config)
+        return rpc_reply
+
+    def rpc_get_port_statistics(self,config):
+        print config
+        rpc_reply = self.netconf.port_statistics(config)
+        print rpc_reply
+        return rpc_reply
+
+    def rpc_get_bst_statistics(self,config):
+        print config
+        rpc_reply = self.netconf.get_bst_statistics(config)
+        return rpc_reply
+
+    #def rpc_get_bst_statistics(self,config):
+    #    print config
+    #     rpc_reply = self.netconf.get_bst_statistics(config)
+    #    return rpc_reply
+
+    def rpc_get_field_processor_group_status(self,config):
+        print config
+        rpc_reply = self.netconf.get_field_processor_group_status(config)
+        return rpc_reply
 
     def recv_notification(self):
-        print 'take notif function'
         try:
-            ret= self.netconf.take_notification(block=True,timeout=1)
-            if ret is None:
-                print 'No Notification to take'
-            else:
-                return ret
+            ret= self.netconf.take_notification(block=True,timeout=2)
+            return ret
         except:
-            print 'exception occured'
+             LOG.info('Some exception occured while receving the notification')
