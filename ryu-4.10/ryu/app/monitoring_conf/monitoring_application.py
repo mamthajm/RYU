@@ -296,7 +296,7 @@ class MonitorApplication(app_manager.RyuApp):
      def get_mon_agent_to_transfer(self,dev_id):
          """Some algorithm that decides on which monitoring agent should be moved
             to other swithch shall run here, hardcoded value returned at the moment"""
-         return str(500)
+         return str(600)
 
 
      def get_new_device_to_transfer_the_agent(self):
@@ -314,7 +314,7 @@ class MonitorApplication(app_manager.RyuApp):
          xml =   """<config>
                     <monitoring-model>
                     <state-machines-list>
-                    <mon-id>500</mon-id>
+                    <mon-id>600</mon-id>
                     <mon-msg-type>MON_HELLO</mon-msg-type>
                     <device-id>10</device-id>
                     <mon-type>FP</mon-type>
@@ -330,11 +330,11 @@ class MonitorApplication(app_manager.RyuApp):
                     <num_of_row_evnts>0</num_of_row_evnts>
                     </input-events>
                     <flow_to_install>
-                    <src_ip>50.0.0.2</src_ip>
+                    <src_ip>50.0.0.6</src_ip>
                     <dst_ip>20.1.1.2</dst_ip>
                     <src_ip_mask>255.255.255.255</src_ip_mask>
                     <dst_ip_mask>255.255.255.255</dst_ip_mask>
-                    <src_mac>00:00:00:00:00:01</src_mac>
+                    <src_mac>00:00:00:00:00:06</src_mac>
                     <dst_mac>00:00:00:00:00:00</dst_mac>
                     <src_mac_mask>00:00:00:00:00:00</src_mac_mask>
                     <dst_mac_mask>00:00:00:00:00:00</dst_mac_mask>
@@ -357,10 +357,10 @@ class MonitorApplication(app_manager.RyuApp):
                     </monitoring-model>
                     </config>"""
 
-         host_name = '127.0.0.1'
+         host_name = '10.42.0.143'
          port_id='830'
-         user='shrikanth'
-         pwd='sdn123'
+         user='root'
+         pwd='onl'
 
 
          tree = self.remove_white_spaces_from_xml_string(xml)
@@ -381,7 +381,7 @@ class MonitorApplication(app_manager.RyuApp):
          xml = """<mon_status xmlns="http://monitoring-automata.net/sdn-mon-automata"><mon-id>500</mon-id><device-id>10</device-id></mon_status>""" #remove this later
          LOG.info( 'mon_status triggered')
          rpc_reply = self.monitor_status_get(xml)## Remove these lines later. This is just to show case that rpc operation is done this way.
-         LOG.info('received monitoring status %s'% rpc_reply)
+         LOG.info('\n Received monitoring status %s'% rpc_reply)
 
 #Monitoring thread that receives async notifications from the switches and handles Monitoring agent movement.
      def monitor_notifications(self):  # monitoring thread that listens to the switches present in the node_list() to get the notification.
@@ -396,7 +396,7 @@ class MonitorApplication(app_manager.RyuApp):
            for device_id in session_keys:                     # Run through the LIST of session_keys.
                if (node_ele.mon_switch_id == device_id):
                   notif = self.monitor_recv_notif(device_id)  # Get the notification from this device.
-                  LOG.info('trying to receive a notification for device %r'% device_id)
+                  LOG.info('\n trying to receive a notification for device %r'% device_id)
                   if notif is not None:
                     print notif.notification_xml
                     notif_xml = ET.fromstring(notif.notification_xml)
@@ -404,22 +404,22 @@ class MonitorApplication(app_manager.RyuApp):
                     is_mon_switch = self.check_for_mon_switch_notification(notif_xml,"http://monitoring-automata.net/sdn-mon-automata")
                     if is_mon_switch == True:
 
-                         dev_id = self.remove_namespace_get_element_text(notif_xml,"http://monitoring-automata.net/sdn-mon-automata","device-Id")
+                         dev_id = self.remove_namespace_get_element_text(notif_xml,"http://monitoring-automata.net/sdn-mon-automata","device-Id") #The string device-Id is same as it is encoded on the switch side.
                          tcam_count = self.remove_namespace_get_element_text(notif_xml,"http://monitoring-automata.net/sdn-mon-automata","TCAM-Count")
                          min_free_entry_dev = self.remove_namespace_get_element_text(notif_xml,"http://monitoring-automata.net/sdn-mon-automata","min-Free-Entry-Count")
                          max_allowed_tcam_entries = self.remove_namespace_get_element_text(notif_xml,"http://monitoring-automata.net/sdn-mon-automata","TCAM-threshold-set")
 
-                         LOG.info('Received MON_SWITCH notification for device %r'%dev_id)
-                         LOG.info('Received MON_SWITCH notification TCAM count used %r'%tcam_count)
-                         LOG.info('Received MON_SWITCH notification min_free_entry_dev %r'%min_free_entry_dev)
-                         LOG.info('Received MON_SWITCH notification max_allowed_tcam_entries %r'%max_allowed_tcam_entries)
+                         LOG.info('\n Received MON_SWITCH notification for device %r'%dev_id)
+                         LOG.info('\n Received MON_SWITCH notification TCAM count used %r'%tcam_count)
+                         LOG.info('\n Received MON_SWITCH notification min_free_entry_dev %r'%min_free_entry_dev)
+                         LOG.info('\n Received MON_SWITCH notification max_allowed_tcam_entries %r'%max_allowed_tcam_entries)
 
                          ssh_dev_session = self.get_session_from_map(dev_id)
                          mon_id = self.get_mon_agent_to_transfer(dev_id)  #Used to get the monitoring agent's ID that should be transferred onto some other switch.
                          xml_string = self.create_mon_status_msg(mon_id,dev_id)
                          rpc_reply = self.monitor_status_get(xml_string)
                          rpc_reply_xml = ET.fromstring(rpc_reply.xml)   #Get the XML equivalent of RPC-Reply. It essentially returns a raw string, process it using fromstring function to get XML.
-                         LOG.info('received monitoring status %s'% rpc_reply)
+                         LOG.info('\n received monitoring status %s'% rpc_reply)
 
                          if rpc_reply is not None:
                             stat_packets = self.remove_namespace_get_element_text(rpc_reply_xml,"http://monitoring-automata.net/sdn-mon-automata","stat-packets")   #Get the packet statistics from Mon-status message.
@@ -432,14 +432,15 @@ class MonitorApplication(app_manager.RyuApp):
                             self.monitor_stop(mon_stop_xml)
 
                             new_mon_params = self.parse_tree_and_update_mon_status(ET.fromstring(mon_params),mon_status_elem)      #Create the monitoring parameters with new monitoring status.
-                            print 'new monitoring parameters to be sent to the switch %s'%new_mon_params
+                            LOG.info('\n new monitoring parameters to be sent to the switch %s'%new_mon_params)
 
                             #This is the interface for switch selection algorithm.
                             new_dev_id = self.get_new_device_to_transfer_the_agent() #At this point it is not sure what needs to be passed to this function. This is the interface for switch selection algo.
+
                             final_mon_params = self.modify_mon_params_with_new_dev_id(new_mon_params,new_dev_id)
-                            print 'Final monitoring parameters to be sent to the switch %s'%final_mon_params
+                            LOG.info('\n Final monitoring parameters to be sent to the switch %s'%final_mon_params)
 
                             xml_string = ET.tostring(final_mon_params)
 
-                            print "\n\n Newly composed XML Content is \n\n %s "%xml_string
-                            self.monitor_start(xml_string,'127.0.0.1',port_id='830',user='shrikanth',pwd='sdn123')
+                            LOG.info( "\n\n Newly composed XML Content is \n\n %s "%xml_string)
+                            self.monitor_start(xml_string,'10.42.0.93',port_id='830',user='root',pwd='onl')
