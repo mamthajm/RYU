@@ -90,11 +90,6 @@ class MonCapableSwitch(object):
         rpc_reply = self.netconf.get_bst_statistics(config)
         return rpc_reply
 
-    #def rpc_get_bst_statistics(self,config):
-    #    print config
-    #     rpc_reply = self.netconf.get_bst_statistics(config)
-    #    return rpc_reply
-
     def rpc_get_field_processor_group_status(self,config):
         print config
         rpc_reply = self.netconf.get_field_processor_group_status(config)

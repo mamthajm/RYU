@@ -41,7 +41,7 @@ class MonitorApplication(app_manager.RyuApp):
 
      def __init__(self, *args, **kwargs):
          super(MonitorApplication, self).__init__(*args, **kwargs)
-         self.node_session_map = {}   #map that contains the switch device ID and its corresponding session information.
+         self.node_session_map = {}   #map that contains the switch device ID and its corresponding SSH session information.
          self.no_of_nodes = 0
          self.node_list = []          #list of nodes being monitored.
          self.mon_started = False
@@ -63,7 +63,7 @@ class MonitorApplication(app_manager.RyuApp):
           xml_without_ns = xml  #copy the contents of the XML string that will be pushed onto the map maintained by the mon_angent object for this device.
           new_tree = self.parse_tree_and_update_attributes(tree,"monitoring-model","xmlns","http://monitoring-automata.net/sdn-mon-automata")
           new_tree = self.parse_tree_and_update_attributes(new_tree,"monitoring-model","xmlns:nc","urn:ietf:params:xml:ns:netconf:base:1.0")
-          new_tree = self.parse_tree_and_update_attributes(new_tree,"state-machines-list","nc:operation","create")
+          new_tree = self.parse_tree_and_update_attributes(new_tree,"monitoring-agent","nc:operation","create")
           xml = ET.tostring(new_tree)
 
           device_id = self.get_device_id_from_xml(xml)  #get the device ID from the monitoring parameters
@@ -263,7 +263,7 @@ class MonitorApplication(app_manager.RyuApp):
         new_elem = ET.SubElement(config_elem,'monitoring-model')
         new_elem.set("xmlns","http://monitoring-automata.net/sdn-mon-automata")
         new_elem.set("xmlns:nc","urn:ietf:params:xml:ns:netconf:base:1.0")
-        st_machine_list_ele = ET.SubElement(new_elem,"state-machines-list")
+        st_machine_list_ele = ET.SubElement(new_elem,"monitoring-agent")
         st_machine_list_ele.set("nc:operation","remove")
         mon_id_elem = ET.SubElement(st_machine_list_ele,'mon-id')
         mon_id_elem.text = mon_id                     #Copy the number of packets accounted so far by the first switch on which we are going to stop Monitoring.
@@ -296,7 +296,7 @@ class MonitorApplication(app_manager.RyuApp):
      def get_mon_agent_to_transfer(self,dev_id):
          """Some algorithm that decides on which monitoring agent should be moved
             to other swithch shall run here, hardcoded value returned at the moment"""
-         return str(600)
+         return str(5)
 
 
      def get_new_device_to_transfer_the_agent(self):
@@ -313,47 +313,34 @@ class MonitorApplication(app_manager.RyuApp):
          #For testing purpose. This is to test appending the mon-status to send it to other switch.
          xml =   """<config>
                     <monitoring-model>
-                    <state-machines-list>
-                    <mon-id>600</mon-id>
+                    <monitoring-agent>
+                    <mon-id>5</mon-id>
                     <mon-msg-type>MON_HELLO</mon-msg-type>
                     <device-id>10</device-id>
                     <mon-type>FP</mon-type>
                     <port-index>2</port-index>
-                    <poll-time>15000</poll-time>
+                    <poll-time>1</poll-time>
                     <state-machine>
-                    <state-table-id>1</state-table-id>
                     <TotalStates>1</TotalStates>
                     <state-table-row-entries>
                     <state>1</state>
                     <input-events>
-                    <row-id>1</row-id>
                     <num_of_row_evnts>0</num_of_row_evnts>
                     </input-events>
                     <flow_to_install>
-                    <src_ip>50.0.0.6</src_ip>
+                    <src_ip>50.0.0.5</src_ip>
                     <dst_ip>20.1.1.2</dst_ip>
                     <src_ip_mask>255.255.255.255</src_ip_mask>
                     <dst_ip_mask>255.255.255.255</dst_ip_mask>
-                    <src_mac>00:00:00:00:00:06</src_mac>
-                    <dst_mac>00:00:00:00:00:00</dst_mac>
-                    <src_mac_mask>00:00:00:00:00:00</src_mac_mask>
-                    <dst_mac_mask>00:00:00:00:00:00</dst_mac_mask>
-                    <src_port>0</src_port>
-                    <dst_port>0</dst_port>
-                    <src_port_mask>0</src_port_mask>
-                    <dst_port_mask>0</dst_port_mask>
-                    <statPktsThreshold>500</statPktsThreshold>
-                    <statBytesThreshold>5000</statBytesThreshold>
                     </flow_to_install>
-                    <num_of_actions>2</num_of_actions>
+                    <num_of_actions>1</num_of_actions>
                     <action>
                     <A1>NOTIFY_CNTLR</A1>
-                    <A2>GOTO_NXT_STATE</A2>
                     </action>
                     <next-state>255</next-state>
                     </state-table-row-entries>
                     </state-machine>
-                    </state-machines-list>
+                    </monitoring-agent>
                     </monitoring-model>
                     </config>"""
 
@@ -387,22 +374,19 @@ class MonitorApplication(app_manager.RyuApp):
      def monitor_notifications(self):  # monitoring thread that listens to the switches present in the node_list() to get the notification.
         self.testcases()             #this is to run test cases
         while True:
-         #for i in threading.enumerate():
-         #  if i.name == "MainThread":
-         #    print i.is_alive()
          hub.sleep(1)
          session_keys = self.node_session_map.keys()          # Get the session keys(device IDs) into a LIST from the MAP (Device ID -> Session Map)
          for node_ele in self.node_list:                       # Run through the LIST of mon_agent(s) populated every first time when there is a new monitoring request for a particular device.
            for device_id in session_keys:                     # Run through the LIST of session_keys.
                if (node_ele.mon_switch_id == device_id):
                   notif = self.monitor_recv_notif(device_id)  # Get the notification from this device.
-                  LOG.info('\n trying to receive a notification for device %r'% device_id)
+                  LOG.info('\n Trying to receive notification from the device %r'% device_id)
                   if notif is not None:
                     print notif.notification_xml
                     notif_xml = ET.fromstring(notif.notification_xml)
                     print ET.dump(notif_xml)
                     is_mon_switch = self.check_for_mon_switch_notification(notif_xml,"http://monitoring-automata.net/sdn-mon-automata")
-                    if is_mon_switch == True:
+                    if is_mon_switch == True: #if the received message notification is to switch the agents then run the below algorithm.
 
                          dev_id = self.remove_namespace_get_element_text(notif_xml,"http://monitoring-automata.net/sdn-mon-automata","device-Id") #The string device-Id is same as it is encoded on the switch side.
                          tcam_count = self.remove_namespace_get_element_text(notif_xml,"http://monitoring-automata.net/sdn-mon-automata","TCAM-Count")
@@ -411,36 +395,42 @@ class MonitorApplication(app_manager.RyuApp):
 
                          LOG.info('\n Received MON_SWITCH notification for device %r'%dev_id)
                          LOG.info('\n Received MON_SWITCH notification TCAM count used %r'%tcam_count)
-                         LOG.info('\n Received MON_SWITCH notification min_free_entry_dev %r'%min_free_entry_dev)
-                         LOG.info('\n Received MON_SWITCH notification max_allowed_tcam_entries %r'%max_allowed_tcam_entries)
+                         LOG.info('\n Received MON_SWITCH notification Threshold %r'%min_free_entry_dev)
+                         LOG.info('\n Received MON_SWITCH notification max_allowed_tcam_entries on the device %r'%max_allowed_tcam_entries)
 
                          ssh_dev_session = self.get_session_from_map(dev_id)
-                         mon_id = self.get_mon_agent_to_transfer(dev_id)  #Used to get the monitoring agent's ID that should be transferred onto some other switch.
-                         xml_string = self.create_mon_status_msg(mon_id,dev_id)
-                         rpc_reply = self.monitor_status_get(xml_string)
-                         rpc_reply_xml = ET.fromstring(rpc_reply.xml)   #Get the XML equivalent of RPC-Reply. It essentially returns a raw string, process it using fromstring function to get XML.
-                         LOG.info('\n received monitoring status %s'% rpc_reply)
+                         rules_to_transfer =  (tcam_count -  min_free_entry_dev) #Calculate the number of TCAM entries to transfer.
+                         Log.info('\n Number of TCAM rules/Monitoring agents to transfer %r'%rules_to_transfer)
+                         tcam_trnsfd_count = 0 #This is used to track the number of agents that have been moved to some other switch.
+                         while(tcam_trnsfd_count < rules_to_transfer):
+                             mon_id = self.get_mon_agent_to_transfer(dev_id)  #Used to get the monitoring agent's ID that should be transferred onto some other switch.
+                             xml_string = self.create_mon_status_msg(mon_id,dev_id)
+                             rpc_reply = self.monitor_status_get(xml_string)
+                             rpc_reply_xml = ET.fromstring(rpc_reply.xml)   #Get the XML equivalent of RPC-Reply. It essentially returns a raw string, process it using fromstring function to get XML.
+                             LOG.info('\n received monitoring status %s'% rpc_reply)
 
-                         if rpc_reply is not None:
-                            stat_packets = self.remove_namespace_get_element_text(rpc_reply_xml,"http://monitoring-automata.net/sdn-mon-automata","stat-packets")   #Get the packet statistics from Mon-status message.
-                            stat_bytes =   self.remove_namespace_get_element_text(rpc_reply_xml,"http://monitoring-automata.net/sdn-mon-automata","stat-bytes")     #Get the bytes statistics from Mon-Satus message.
+                             if rpc_reply is not None:
+                                stat_packets = self.remove_namespace_get_element_text(rpc_reply_xml,"http://monitoring-automata.net/sdn-mon-automata","stat-packets")   #Get the packet statistics from Mon-status message.
+                                stat_bytes =   self.remove_namespace_get_element_text(rpc_reply_xml,"http://monitoring-automata.net/sdn-mon-automata","stat-bytes")     #Get the bytes statistics from Mon-Satus message.
 
-                            mon_status_elem = self.create_monitoring_status_sub_tree(stat_packets,stat_bytes)       #create a monitoring_status subtree to append it to MON_HELLO message.
-                            mon_params = node_ele.get_mon_params_frm_mon_agents_map(mon_id)                         #get the monitoring parameters from the mon_agent object of the switch that is currently monitoring this flow  and modify the parameters by adding monitorin_status sub-tree.
+                                mon_status_elem = self.create_monitoring_status_sub_tree(stat_packets,stat_bytes)       #create a monitoring_status subtree to append it to MON_HELLO message.
+                                mon_params = node_ele.get_mon_params_frm_mon_agents_map(mon_id)                         #get the monitoring parameters from the mon_agent object of the switch that is currently monitoring this flow  and modify the parameters by adding monitorin_status sub-tree.
 
-                            mon_stop_xml = self.create_mon_stop_msg(mon_id,dev_id)   #Stop the monitoring on this switch.
-                            self.monitor_stop(mon_stop_xml)
+                                mon_stop_xml = self.create_mon_stop_msg(mon_id,dev_id)   #Stop the monitoring on this switch.
+                                self.monitor_stop(mon_stop_xml)
 
-                            new_mon_params = self.parse_tree_and_update_mon_status(ET.fromstring(mon_params),mon_status_elem)      #Create the monitoring parameters with new monitoring status.
-                            LOG.info('\n new monitoring parameters to be sent to the switch %s'%new_mon_params)
+                                new_mon_params = self.parse_tree_and_update_mon_status(ET.fromstring(mon_params),mon_status_elem)      #Create the monitoring parameters with new monitoring status.
+                                LOG.info('\n new monitoring parameters to be sent to the switch %s'%new_mon_params)
 
-                            #This is the interface for switch selection algorithm.
-                            new_dev_id = self.get_new_device_to_transfer_the_agent() #At this point it is not sure what needs to be passed to this function. This is the interface for switch selection algo.
+                                #This is the interface for switch selection algorithm.
+                                new_dev_id = self.get_new_device_to_transfer_the_agent() #At this point it is not sure what needs to be passed to this function. This is the interface for the switch selection algorithm.
 
-                            final_mon_params = self.modify_mon_params_with_new_dev_id(new_mon_params,new_dev_id)
-                            LOG.info('\n Final monitoring parameters to be sent to the switch %s'%final_mon_params)
+                                final_mon_params = self.modify_mon_params_with_new_dev_id(new_mon_params,new_dev_id)
+                                LOG.info('\n Final monitoring parameters to be sent to the switch %s'%final_mon_params)
 
-                            xml_string = ET.tostring(final_mon_params)
+                                xml_string = ET.tostring(final_mon_params)  #conver this into an XML String.
 
-                            LOG.info( "\n\n Newly composed XML Content is \n\n %s "%xml_string)
-                            self.monitor_start(xml_string,'10.42.0.93',port_id='830',user='root',pwd='onl')
+                                LOG.info( "\n\n Newly composed XML Content is \n\n %s "%xml_string)
+                                self.monitor_start(xml_string,'10.42.0.93',port_id='830',user='root',pwd='onl')
+
+                             tcam_trnsfd_count = (tcam_trnsfd_count + 1)  #Just increment the counter to keep track of number of agents that were transferred.
