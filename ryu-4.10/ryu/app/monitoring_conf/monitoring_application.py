@@ -14,7 +14,7 @@
 # limitations under the License.
 
 """
-A monitoring application.
+A monitoring application. Uses ncclient library that is available with code repository.
 """
 
 import logging
@@ -90,6 +90,7 @@ class MonitorApplication(app_manager.RyuApp):
                 node.insert_to_mon_agents_map(mon_agent_id,xml_without_ns)   #Insert the monitoring parameters into the switch object. xml_without_ns is in XML form and not in String form.
 
           else:
+                LOG.info('Monitoring agent already exist, so using that session')
                 session = self.get_session_from_map(device_id)
                 target = 'running'
                 config = xml
@@ -111,9 +112,10 @@ class MonitorApplication(app_manager.RyuApp):
 
          for node_ele in self.node_list:
             if (node_ele.mon_switch_id == device_id):
-                node_ele.remove_from_mon_agents_map(mon_agent_id)   #remove the mon_agent from the map maintained by MonAgent object.
+                node_ele.remove_from_mon_agents_map(mon_agent_id)   #remove the mon_agent from the map maintained by MonAgent object which containt moniroting configuration.
                 if len(node_ele.mon_agents_map) == 0:
                     session.close_session()             #if the removed mon_agent is the last node in the map, close the session and
+                    del self.node_session_map[device_id]    # remove the session that exist for this device_id also.
                 self.node_list.remove(node_ele)         #remove the node information from the node_list.
 
 #Below function is used to trigger the monitoring parameter change requests from other RYU applications that maintain traffic flows.
@@ -301,7 +303,7 @@ class MonitorApplication(app_manager.RyuApp):
 
      def get_new_device_to_transfer_the_agent(self):
          """This function returns the appropriate switch device onto which monitoring agent should be transferred"""
-         return str(20)    #Hardcode the device-id for time being.
+         return str(20)    #Hardcode the device-id for time being. Assign this Accton AS7712 switch
 
 #simple function TO RUN VARIOUS TESTCASES.
      def testcases(self):
@@ -344,10 +346,10 @@ class MonitorApplication(app_manager.RyuApp):
                     </monitoring-model>
                     </config>"""
 
-         host_name = '10.42.0.143'
+         host_name = 'localhost'
          port_id='830'
-         user='root'
-         pwd='onl'
+         user='shrikanth'
+         pwd='sdn123'
 
 
          tree = self.remove_white_spaces_from_xml_string(xml)
@@ -391,16 +393,17 @@ class MonitorApplication(app_manager.RyuApp):
                          dev_id = self.remove_namespace_get_element_text(notif_xml,"http://monitoring-automata.net/sdn-mon-automata","device-Id") #The string device-Id is same as it is encoded on the switch side.
                          tcam_count = self.remove_namespace_get_element_text(notif_xml,"http://monitoring-automata.net/sdn-mon-automata","TCAM-Count")
                          min_free_entry_dev = self.remove_namespace_get_element_text(notif_xml,"http://monitoring-automata.net/sdn-mon-automata","min-Free-Entry-Count")
-                         max_allowed_tcam_entries = self.remove_namespace_get_element_text(notif_xml,"http://monitoring-automata.net/sdn-mon-automata","TCAM-threshold-set")
+                         max_allowed_tcam_entries = self.remove_namespace_get_element_text(notif_xml,"http://monitoring-automata.net/sdn-mon-automata","TCAM-threshold-set") #maximum allowed for monitoring.
 
                          LOG.info('\n Received MON_SWITCH notification for device %r'%dev_id)
                          LOG.info('\n Received MON_SWITCH notification TCAM count used %r'%tcam_count)
-                         LOG.info('\n Received MON_SWITCH notification Threshold %r'%min_free_entry_dev)
-                         LOG.info('\n Received MON_SWITCH notification max_allowed_tcam_entries on the device %r'%max_allowed_tcam_entries)
+                         LOG.info('\n Received MON_SWITCH notification MINUIMUM number of free entries for other purposes than monitorin %r'%min_free_entry_dev)
+                         LOG.info('\n Received MON_SWITCH notification Threshold on the device %r'%max_allowed_tcam_entries)
 
                          ssh_dev_session = self.get_session_from_map(dev_id)
-                         rules_to_transfer =  (tcam_count -  min_free_entry_dev) #Calculate the number of TCAM entries to transfer.
-                         Log.info('\n Number of TCAM rules/Monitoring agents to transfer %r'%rules_to_transfer)
+                         rules_to_transfer =  (int(tcam_count) -  int(max_allowed_tcam_entries)) #Calculate the number of TCAM entries to transfer.
+                         #rules_to_transfer = 1 #for time being hardcode the number of rules to be transferred to 1.
+                         LOG.info('\n Number of TCAM rules/Monitoring agents to transfer %r'%rules_to_transfer)
                          tcam_trnsfd_count = 0 #This is used to track the number of agents that have been moved to some other switch.
                          while(tcam_trnsfd_count < rules_to_transfer):
                              mon_id = self.get_mon_agent_to_transfer(dev_id)  #Used to get the monitoring agent's ID that should be transferred onto some other switch.
@@ -431,6 +434,10 @@ class MonitorApplication(app_manager.RyuApp):
                                 xml_string = ET.tostring(final_mon_params)  #conver this into an XML String.
 
                                 LOG.info( "\n\n Newly composed XML Content is \n\n %s "%xml_string)
-                                self.monitor_start(xml_string,'10.42.0.93',port_id='830',user='root',pwd='onl')
+                                host_name = '10.42.0.93'
+                                port_id='830'
+                                user='root'
+                                pwd='onl'
+                                self.monitor_start(xml_string,host_name ,port_id,user,pwd)
 
                              tcam_trnsfd_count = (tcam_trnsfd_count + 1)  #Just increment the counter to keep track of number of agents that were transferred.
