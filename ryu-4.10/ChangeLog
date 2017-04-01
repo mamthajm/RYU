@@ -1,4 +1,8 @@
 CHANGES
 =======
 
+* Improvement to the agent movement algorithm
+* Fix for MONITORING_SWITCH scenario
+* bla
+* Full Controller side for Monitoring agent movement
 * Initital commit of full repository

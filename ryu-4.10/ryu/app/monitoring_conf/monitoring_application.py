@@ -14,7 +14,7 @@
 # limitations under the License.
 
 """
-A monitoring application. Uses ncclient library that is available with code repository.
+A monitoring application. Uses ncclient library that is available with the code repository.
 """
 
 import logging
@@ -258,7 +258,7 @@ class MonitorApplication(app_manager.RyuApp):
         return ET.tostring(new_elem)
 
 
-#This function is used to CREATE the 'mon_status' request message to be sent to the switch.
+#This function is used to CREATE the 'mon_stop' request message to be sent to the switch.
      def create_mon_stop_msg(self,mon_id,dev_id):
         """Creates and returns the mon_stop message in string format"""
         config_elem = ET.Element('config')
@@ -321,7 +321,7 @@ class MonitorApplication(app_manager.RyuApp):
                     <device-id>10</device-id>
                     <mon-type>FP</mon-type>
                     <port-index>2</port-index>
-                    <poll-time>1</poll-time>
+                    <poll-time>10</poll-time>
                     <state-machine>
                     <TotalStates>1</TotalStates>
                     <state-table-row-entries>
@@ -337,7 +337,7 @@ class MonitorApplication(app_manager.RyuApp):
                     </flow_to_install>
                     <num_of_actions>1</num_of_actions>
                     <action>
-                    <A1>NOTIFY_CNTLR</A1>
+                    <A1>NO_ACTION</A1>
                     </action>
                     <next-state>255</next-state>
                     </state-table-row-entries>
@@ -346,10 +346,10 @@ class MonitorApplication(app_manager.RyuApp):
                     </monitoring-model>
                     </config>"""
 
-         host_name = 'localhost'
+         host_name = '10.42.0.143' #This should be localhost if the NETCONF server is running on a ubuntu machine
          port_id='830'
-         user='shrikanth'
-         pwd='sdn123'
+         user='root' 		   #This will change according to where NETCONF server is running, root and onl is for logging into the switch
+         pwd='onl'
 
 
          tree = self.remove_white_spaces_from_xml_string(xml)
@@ -438,6 +438,6 @@ class MonitorApplication(app_manager.RyuApp):
                                 port_id='830'
                                 user='root'
                                 pwd='onl'
-                                self.monitor_start(xml_string,host_name ,port_id,user,pwd)
+                                self.monitor_start(xml_string,host_name,port_id,user,pwd)
 
                              tcam_trnsfd_count = (tcam_trnsfd_count + 1)  #Just increment the counter to keep track of number of agents that were transferred.
