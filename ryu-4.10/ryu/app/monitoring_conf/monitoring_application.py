@@ -33,6 +33,7 @@ from ryu.controller.handler import MAIN_DISPATCHER, DEAD_DISPATCHER
 from ryu.controller.handler import set_ev_cls
 from ryu.lib import hub
 import re
+from sys import getsizeof
 
 LOG = logging.getLogger(__name__)
 
@@ -41,10 +42,12 @@ class MonitorApplication(app_manager.RyuApp):
 
      def __init__(self, *args, **kwargs):
          super(MonitorApplication, self).__init__(*args, **kwargs)
+	 print('mon hell')
          self.node_session_map = {}   #map that contains the switch device ID and its corresponding SSH session information.
          self.no_of_nodes = 0
          self.node_list = []          #list of nodes being monitored.
          self.mon_started = False
+         self.time_diff = []
          self.monitor_thread = 0
          if self.mon_started is False:
             self.monitor_thread = hub.spawn(self.monitor_notifications())  #starts a monitoring thread that receives notifications from the network device.
@@ -271,7 +274,7 @@ class MonitorApplication(app_manager.RyuApp):
         mon_id_elem.text = mon_id                     #Copy the number of packets accounted so far by the first switch on which we are going to stop Monitoring.
         dev_id_elem = ET.SubElement(st_machine_list_ele,'device-id')
         dev_id_elem.text = dev_id                    #Copy the number of Bytes accounted so far by the switch on which we are goint to stop Monitoring.
-        print ET.dump(config_elem)
+        #print ET.dump(config_elem)
         return ET.tostring(config_elem)
         #xml = """<config>
         #         <monitoring-model xmlns="http://monitoring-automata.net/sdn-mon-automata" xmlns:nc="urn:ietf:params:xml:ns:netconf:base:1.0">
@@ -346,7 +349,7 @@ class MonitorApplication(app_manager.RyuApp):
                     </monitoring-model>
                     </config>"""
 
-         host_name = '10.42.0.143' #This should be localhost if the NETCONF server is running on a ubuntu machine
+         host_name = '192.168.0.105' #This should be localhost if the NETCONF server is running on a ubuntu machine
          port_id='830'
          user='root' 		   #This will change according to where NETCONF server is running, root and onl is for logging into the switch
          pwd='onl'
@@ -375,8 +378,10 @@ class MonitorApplication(app_manager.RyuApp):
 #Monitoring thread that receives async notifications from the switches and handles Monitoring agent movement.
      def monitor_notifications(self):  # monitoring thread that listens to the switches present in the node_list() to get the notification.
         self.testcases()             #this is to run test cases
+
         while True:
-         hub.sleep(1)
+         #hub.sleep(1)
+         #f = open('/time_difference.dat', 'w')
          session_keys = self.node_session_map.keys()          # Get the session keys(device IDs) into a LIST from the MAP (Device ID -> Session Map)
          for node_ele in self.node_list:                       # Run through the LIST of mon_agent(s) populated every first time when there is a new monitoring request for a particular device.
            for device_id in session_keys:                     # Run through the LIST of session_keys.
@@ -384,9 +389,26 @@ class MonitorApplication(app_manager.RyuApp):
                   notif = self.monitor_recv_notif(device_id)  # Get the notification from this device.
                   LOG.info('\n Trying to receive notification from the device %r'% device_id)
                   if notif is not None:
-                    print notif.notification_xml
-                    notif_xml = ET.fromstring(notif.notification_xml)
-                    print ET.dump(notif_xml)
+                    #print notif.notification_xml
+                    notif_xml = ET.fromstring(notif.notification_xml) #conversion form string to xml
+                    packet_size = len(notif.notification_xml.encode('utf8'))
+                    print 'packet size: ', packet_size
+                    #print 'printing tree of xml'
+                    #print notif_xml[1].tag
+                    root_check = notif_xml[1].tag
+                    if 'MON_EVENT_NOTIFICATION' in root_check:
+                        timestamp_val = int(notif_xml[1][4].text)
+                        packet_number = int(notif_xml[1][5].text)
+                        current_millis = int(round(time.time() * 1000))
+                        print 'Timestamp value : ', timestamp_val
+                        print 'Current time:', current_millis
+                        print 'packet number:', packet_number
+                        time_diff = int(current_millis - timestamp_val)
+                        #f.write(str(time_diff)+'\n')
+                        self.time_diff.append(time_diff)
+                        print 'Time diff', self.time_diff
+                        #f.close()
+                    #print ET.dump(notif_xml)
                     is_mon_switch = self.check_for_mon_switch_notification(notif_xml,"http://monitoring-automata.net/sdn-mon-automata")
                     if is_mon_switch == True: #if the received message notification is to switch the agents then run the below algorithm.
 
@@ -434,10 +456,12 @@ class MonitorApplication(app_manager.RyuApp):
                                 xml_string = ET.tostring(final_mon_params)  #conver this into an XML String.
 
                                 LOG.info( "\n\n Newly composed XML Content is \n\n %s "%xml_string)
-                                host_name = '10.42.0.93'
+                                host_name = '192.168.0.105'
                                 port_id='830'
                                 user='root'
                                 pwd='onl'
                                 self.monitor_start(xml_string,host_name,port_id,user,pwd)
 
                              tcam_trnsfd_count = (tcam_trnsfd_count + 1)  #Just increment the counter to keep track of number of agents that were transferred.
+        #print 'Time different list:'
+        #print self.time_diff
